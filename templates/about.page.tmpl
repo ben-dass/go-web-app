@@ -7,6 +7,16 @@
         <div class="col">
             <h1>About</h1>
             <p>This is some text.</p>
+            
+            <p>This came from the template: {{ index .StringMap "test" }}</p>
+            
+            <p>
+                {{ if ne (index .StringMap "remote_ip") "" }}
+                    Your remote IP address is {{  index .StringMap "remote_ip" }}
+                {{ else }}
+                    Unable to identify your IP. Visit the <a href="/">Home</a> so it can be set.
+                {{ end }}
+            </p>
         </div >
     </div >
 </div >

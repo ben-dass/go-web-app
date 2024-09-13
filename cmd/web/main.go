@@ -4,7 +4,9 @@ import (
     "fmt"
     "log"
     "net/http"
+    "time"
     
+    "github.com/alexedwards/scs/v2"
     "go-web-app-p1/pkg/config"
     "go-web-app-p1/pkg/handlers"
     "go-web-app-p1/pkg/render"
@@ -12,19 +14,40 @@ import (
 
 const webPort = ":8080"
 
+var app config.AppConfig
+var session *scs.SessionManager
+
 func main() {
-    var app config.AppConfig
-    
     tc, err := render.CreateTemplateCache()
     if err != nil {
         log.Fatal("cannot create template cache")
     }
     
     app.TemplateCache = tc
+    app.UseCache = false
+    app.InProduction = false
     
-    http.HandleFunc("/", handlers.Home)
-    http.HandleFunc("/about", handlers.About)
+    session = scs.New()
+    session.Lifetime = 24 * time.Hour
+    session.Cookie.Persist = true
+    session.Cookie.SameSite = http.SameSiteLaxMode
+    session.Cookie.Secure = app.InProduction
+    
+    app.Session = session
+    
+    repo := handlers.NewRepo(&app)
+    handlers.NewHandlers(repo)
+    
+    render.NewTemplates(&app)
+    
+    srv := &http.Server{
+        Addr:    webPort,
+        Handler: routes(&app),
+    }
     
     fmt.Printf("Starting server at port %s\n", webPort)
-    _ = http.ListenAndServe(webPort, nil)
+    err = srv.ListenAndServe()
+    if err != nil {
+        log.Fatal(err)
+    }
 }

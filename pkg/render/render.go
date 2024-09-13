@@ -2,27 +2,43 @@ package render
 
 import (
     "bytes"
-    "fmt"
     "html/template"
     "log"
     "net/http"
     "path/filepath"
+    
+    "go-web-app-p1/pkg/config"
+    "go-web-app-p1/pkg/models"
 )
 
-func Template(w http.ResponseWriter, tmpl string) {
-    tmplCache, err := CreateTemplateCache()
-    if err != nil {
-        log.Fatal("Error creating template cache:", err)
+var app *config.AppConfig
+
+func NewTemplates(a *config.AppConfig) {
+    app = a
+}
+
+func AddDefaultData(td *models.TemplateData) *models.TemplateData {
+    return td
+}
+
+func TemplateRender(w http.ResponseWriter, tmpl string, td *models.TemplateData) {
+    var tc map[string]*template.Template
+    
+    if app.UseCache {
+        tc = app.TemplateCache
+    } else {
+        tc, _ = CreateTemplateCache()
     }
     
-    t, ok := tmplCache[tmpl]
+    t, ok := tc[tmpl]
     if !ok {
         log.Fatal("Error loading template:", tmpl)
     }
     
     buff := new(bytes.Buffer)
+    td = AddDefaultData(td)
     
-    err = t.Execute(buff, nil)
+    err := t.Execute(buff, td)
     if err != nil {
         log.Println("Error executing template:", err)
     }
@@ -34,7 +50,7 @@ func Template(w http.ResponseWriter, tmpl string) {
 }
 
 func CreateTemplateCache() (map[string]*template.Template, error) {
-    templateCache := map[string]*template.Template{}
+    tc := map[string]*template.Template{}
     
     pages, err := filepath.Glob("./templates/*.page.tmpl")
     if err != nil {
@@ -46,24 +62,23 @@ func CreateTemplateCache() (map[string]*template.Template, error) {
         
         templateSet, err := template.New(name).ParseFiles(page)
         if err != nil {
-            return templateCache, err
+            return tc, err
         }
         
         matches, err := filepath.Glob("./templates/*.layout.tmpl")
         if err != nil {
-            return templateCache, err
+            return tc, err
         }
         
         if len(matches) > 0 {
             templateSet, err = templateSet.ParseGlob("./templates/*.layout.tmpl")
             if err != nil {
-                return templateCache, err
+                return tc, err
             }
         }
         
-        templateCache[name] = templateSet
+        tc[name] = templateSet
     }
     
-    fmt.Println(templateCache)
-    return templateCache, nil
+    return tc, nil
 }
