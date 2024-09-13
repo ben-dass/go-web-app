@@ -5,11 +5,13 @@ import (
     "fmt"
     "log"
     "net/http"
+    "os"
     "time"
     
     "github.com/alexedwards/scs/v2"
     "github.com/ben-dass/go-web-app/internal/config"
     "github.com/ben-dass/go-web-app/internal/handlers"
+    "github.com/ben-dass/go-web-app/internal/helpers"
     "github.com/ben-dass/go-web-app/internal/models"
     "github.com/ben-dass/go-web-app/internal/render"
 )
@@ -21,11 +23,31 @@ var session *scs.SessionManager
 
 // main is the main function
 func main() {
+    err := run()
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    srv := &http.Server{
+        Addr:    portNumber,
+        Handler: routes(&app),
+    }
+    
+    err = srv.ListenAndServe()
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+func run() error {
     // what am I going to put in the session
     gob.Register(models.Reservation{})
     
     // change this to true when in production
     app.InProduction = false
+    
+    app.InfoLog = log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
+    app.ErrorLog = log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
     
     // set up the session
     session = scs.New()
@@ -39,6 +61,7 @@ func main() {
     tc, err := render.CreateTemplateCache()
     if err != nil {
         log.Fatal("cannot create template cache")
+        return err
     }
     
     app.TemplateCache = tc
@@ -46,18 +69,10 @@ func main() {
     
     repo := handlers.NewRepo(&app)
     handlers.NewHandlers(repo)
-    
     render.NewTemplates(&app)
+    helpers.NewHelpers(&app)
     
     fmt.Println(fmt.Sprintf("Staring application on port %s", portNumber))
     
-    srv := &http.Server{
-        Addr:    portNumber,
-        Handler: routes(&app),
-    }
-    
-    err = srv.ListenAndServe()
-    if err != nil {
-        log.Fatal(err)
-    }
+    return nil
 }
