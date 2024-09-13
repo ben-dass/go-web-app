@@ -1,32 +1,33 @@
 package main
 
 import (
+    "encoding/gob"
     "fmt"
     "log"
     "net/http"
     "time"
     
     "github.com/alexedwards/scs/v2"
-    "github.com/ben-dass/go-web-app/pkg/config"
-    "github.com/ben-dass/go-web-app/pkg/handlers"
-    "github.com/ben-dass/go-web-app/pkg/render"
+    "github.com/ben-dass/go-web-app/internal/config"
+    "github.com/ben-dass/go-web-app/internal/handlers"
+    "github.com/ben-dass/go-web-app/internal/models"
+    "github.com/ben-dass/go-web-app/internal/render"
 )
 
-const webPort = ":8080"
+const portNumber = ":8080"
 
 var app config.AppConfig
 var session *scs.SessionManager
 
+// main is the main function
 func main() {
-    tc, err := render.CreateTemplateCache()
-    if err != nil {
-        log.Fatal("cannot create template cache")
-    }
+    // what am I going to put in the session
+    gob.Register(models.Reservation{})
     
-    app.TemplateCache = tc
-    app.UseCache = false
+    // change this to true when in production
     app.InProduction = false
     
+    // set up the session
     session = scs.New()
     session.Lifetime = 24 * time.Hour
     session.Cookie.Persist = true
@@ -35,17 +36,26 @@ func main() {
     
     app.Session = session
     
+    tc, err := render.CreateTemplateCache()
+    if err != nil {
+        log.Fatal("cannot create template cache")
+    }
+    
+    app.TemplateCache = tc
+    app.UseCache = false
+    
     repo := handlers.NewRepo(&app)
     handlers.NewHandlers(repo)
     
     render.NewTemplates(&app)
     
+    fmt.Println(fmt.Sprintf("Staring application on port %s", portNumber))
+    
     srv := &http.Server{
-        Addr:    webPort,
+        Addr:    portNumber,
         Handler: routes(&app),
     }
     
-    fmt.Printf("Starting server at port %s\n", webPort)
     err = srv.ListenAndServe()
     if err != nil {
         log.Fatal(err)
