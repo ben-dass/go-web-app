@@ -7,9 +7,9 @@ import (
     "time"
     
     "github.com/alexedwards/scs/v2"
-    "go-web-app-p1/pkg/config"
-    "go-web-app-p1/pkg/handlers"
-    "go-web-app-p1/pkg/render"
+    "github.com/ben-dass/go-web-app/pkg/config"
+    "github.com/ben-dass/go-web-app/pkg/handlers"
+    "github.com/ben-dass/go-web-app/pkg/render"
 )
 
 const webPort = ":8080"
