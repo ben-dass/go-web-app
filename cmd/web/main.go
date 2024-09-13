@@ -1,32 +1,55 @@
 package main
 
 import (
+    "encoding/gob"
     "fmt"
     "log"
     "net/http"
+    "os"
     "time"
     
     "github.com/alexedwards/scs/v2"
-    "go-web-app-p1/pkg/config"
-    "go-web-app-p1/pkg/handlers"
-    "go-web-app-p1/pkg/render"
+    "github.com/ben-dass/go-web-app/internal/config"
+    "github.com/ben-dass/go-web-app/internal/handlers"
+    "github.com/ben-dass/go-web-app/internal/helpers"
+    "github.com/ben-dass/go-web-app/internal/models"
+    "github.com/ben-dass/go-web-app/internal/render"
 )
 
-const webPort = ":8080"
+const portNumber = ":8080"
 
 var app config.AppConfig
 var session *scs.SessionManager
 
+// main is the main function
 func main() {
-    tc, err := render.CreateTemplateCache()
+    err := run()
     if err != nil {
-        log.Fatal("cannot create template cache")
+        log.Fatal(err)
     }
     
-    app.TemplateCache = tc
-    app.UseCache = false
+    srv := &http.Server{
+        Addr:    portNumber,
+        Handler: routes(&app),
+    }
+    
+    err = srv.ListenAndServe()
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+func run() error {
+    // what am I going to put in the session
+    gob.Register(models.Reservation{})
+    
+    // change this to true when in production
     app.InProduction = false
     
+    app.InfoLog = log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
+    app.ErrorLog = log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+    
+    // set up the session
     session = scs.New()
     session.Lifetime = 24 * time.Hour
     session.Cookie.Persist = true
@@ -35,19 +58,21 @@ func main() {
     
     app.Session = session
     
+    tc, err := render.CreateTemplateCache()
+    if err != nil {
+        log.Fatal("cannot create template cache")
+        return err
+    }
+    
+    app.TemplateCache = tc
+    app.UseCache = false
+    
     repo := handlers.NewRepo(&app)
     handlers.NewHandlers(repo)
-    
     render.NewTemplates(&app)
+    helpers.NewHelpers(&app)
     
-    srv := &http.Server{
-        Addr:    webPort,
-        Handler: routes(&app),
-    }
+    fmt.Println(fmt.Sprintf("Staring application on port %s", portNumber))
     
-    fmt.Printf("Starting server at port %s\n", webPort)
-    err = srv.ListenAndServe()
-    if err != nil {
-        log.Fatal(err)
-    }
+    return nil
 }
